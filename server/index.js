@@ -6,6 +6,8 @@ const pool = require('./db');
 
 // IMPORT ROUTES
 const authRoutes = require('./routes/auth'); // <--- NEW
+const ticketRoutes = require("./routes/tickets");
+
 
 dotenv.config();
 
@@ -18,7 +20,7 @@ app.use(express.json());
 
 // USE ROUTES
 app.use('/auth', authRoutes); // <--- NEW (This enables http://localhost:5000/auth/login)
-
+app.use("/tickets", ticketRoutes); // <--- NEW (This enables http://localhost:5000/tickets/create)
 // Health Checks
 app.get('/', (req, res) => {
     res.json({ message: "SUD Life Support System API is Running 🚀" });
