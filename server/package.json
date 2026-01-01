@@ -9,7 +9,6 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
-  "description": "",
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
@@ -18,5 +17,6 @@
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^7.0.12",
     "pg": "^8.16.3"
-  }
+  },
+  "description": ""
 }

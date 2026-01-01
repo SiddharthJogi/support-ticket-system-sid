@@ -4,9 +4,28 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>client</title>
+    <title>SUD Life Support</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              sud: {
+                red: "#ED1C24",      /* Primary SUD Red */
+                blue: "#003366",     /* Corporate Blue */
+                light: "#F5F5F5",    /* Light Grey Background */
+                warning: "#FFC107",
+                success: "#28A745",
+              }
+            }
+          }
+        }
+      }
+    </script>
   </head>
-  <body>
+  <body class="bg-sud-light">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
