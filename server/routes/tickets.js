@@ -2,6 +2,8 @@
 const router = require("express").Router();
 const pool = require("../db");
 const authorize = require("../middleware/authorization");
+const nodemailer = require("nodemailer");
+require("dotenv").config(); // Ensure env vars are loaded
 
 // --- SECURITY MIDDLEWARE ---
 const checkRole = (allowedRoles) => {
@@ -13,7 +15,7 @@ const checkRole = (allowedRoles) => {
   };
 };
 
-// 1. CREATE TICKET (User Only)
+// 1. CREATE TICKET (User)
 router.post("/", authorize, checkRole(['user']), async (req, res) => {
   try {
     const { title, description, category, priority } = req.body;
@@ -25,7 +27,7 @@ router.post("/", authorize, checkRole(['user']), async (req, res) => {
   } catch (err) { res.status(500).send("Server Error"); }
 });
 
-// 2. GET ALL TICKETS (Manager Only)
+// 2. GET ALL TICKETS (Manager)
 router.get("/all", authorize, checkRole(['manager', 'admin']), async (req, res) => {
   try {
     const allTickets = await pool.query(
@@ -39,7 +41,7 @@ router.get("/all", authorize, checkRole(['manager', 'admin']), async (req, res) 
   } catch (err) { res.status(500).send("Server Error"); }
 });
 
-// 3. GET MY ASSIGNED TICKETS (Support Staff Only) <--- RESTORED
+// 3. GET ASSIGNED TICKETS (Support)
 router.get("/assigned", authorize, checkRole(['support', 'manager']), async (req, res) => {
     try {
       const myWork = await pool.query(
@@ -68,7 +70,7 @@ router.get("/my-tickets", authorize, async (req, res) => {
   } catch (err) { res.status(500).send("Server Error"); }
 });
 
-// 5. ASSIGN TICKET (Manager) <--- RESTORED
+// 5. ASSIGN TICKET (Manager)
 router.put("/assign/:id", authorize, checkRole(['manager']), async (req, res) => {
   try {
     const { id } = req.params;
@@ -78,20 +80,85 @@ router.put("/assign/:id", authorize, checkRole(['manager']), async (req, res) =>
   } catch (err) { res.status(500).send("Server Error"); }
 });
 
-// 6. RESOLVE TICKET (Support Staff) <--- RESTORED
+// 6. RESOLVE TICKET (Support Staff) -- FIXED NODEMAILER --
 router.put("/resolve/:id", authorize, checkRole(['support', 'manager']), async (req, res) => {
     try {
       const { id } = req.params;
       const { resolution_notes } = req.body;
-      await pool.query(
-          "UPDATE tickets SET status = 'resolved', resolution_notes = $1 WHERE ticket_id = $2", 
+
+      // 1. Setup Email Credentials inside route (Best Practice)
+      const EMAIL_USER = process.env.EMAIL_USER;
+      const EMAIL_PASS = process.env.EMAIL_PASS;
+
+      if (!EMAIL_USER || !EMAIL_PASS) {
+          console.error("❌ Missing Email Credentials in .env");
+          // Proceed to close ticket even if email fails, but log error
+      }
+
+      // 2. Configure Transporter with Explicit SSL (Port 465)
+      const transporter = nodemailer.createTransport({
+          host: 'smtp.gmail.com', 
+          port: 465,
+          secure: true, // Use SSL
+          auth: {
+              user: EMAIL_USER,
+              pass: EMAIL_PASS
+          },
+          connectionTimeout: 10000 
+      });
+
+      // 3. Update DB
+      const ticketRes = await pool.query(
+          "UPDATE tickets SET status = 'resolved', resolution_notes = $1 WHERE ticket_id = $2 RETURNING *", 
           [resolution_notes, id]
       );
-      res.json({ message: "Ticket Resolved" });
-    } catch (err) { res.status(500).send("Server Error"); }
-  });
 
-// 7. ANALYTICS (Manager) <--- RESTORED
+      if (ticketRes.rows.length === 0) return res.status(404).json({error: "Ticket not found"});
+      
+      // 4. Get Recipient Details
+      const userRes = await pool.query("SELECT full_name, email FROM users WHERE user_id = $1", [ticketRes.rows[0].user_id]);
+      const user = userRes.rows[0];
+
+      // 5. Prepare Email
+      const mailOptions = {
+        from: `"SUD Life Support" <${EMAIL_USER}>`, 
+        to: user.email,
+        subject: `Ticket #${id} Resolved - SUD Life Insurance`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+            <div style="background-color: #003366; padding: 20px; text-align: center; color: white;">
+              <h1 style="margin: 0; font-size: 24px;">SUD Life Support</h1>
+            </div>
+            <div style="padding: 20px;">
+              <p>Dear <strong>${user.full_name}</strong>,</p>
+              <p>Your support ticket <strong>#${id}</strong> has been resolved.</p>
+              <div style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #28a745; margin: 20px 0;">
+                <strong style="color: #28a745;">Resolution:</strong><br/>
+                <p>${resolution_notes}</p>
+              </div>
+              <p>Please login to your dashboard to view details.</p>
+            </div>
+          </div>
+        `
+      };
+
+      // 6. Send & Log
+      try {
+        await transporter.sendMail(mailOptions);
+        console.log(`✅ Email sent to ${user.email}`);
+      } catch (emailErr) {
+        console.error("❌ Email Failed:", emailErr);
+      }
+
+      res.json({ message: "Ticket Resolved" });
+
+    } catch (err) { 
+        console.error(err);
+        res.status(500).send("Server Error"); 
+    }
+});
+
+// 7. ANALYTICS (Manager)
 router.get("/analytics", authorize, checkRole(['manager']), async (req, res) => {
     try {
         const team = await pool.query(`

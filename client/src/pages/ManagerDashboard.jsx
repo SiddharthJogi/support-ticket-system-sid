@@ -7,15 +7,14 @@ import { FiGrid, FiUsers, FiActivity, FiLogOut, FiCheckCircle, FiClock, FiAlertC
 
 const ManagerDashboard = () => {
   const [data, setData] = useState({ tickets: [], team: [], stats: {} });
-  const [myWork, setMyWork] = useState([]); // Tickets assigned to logged-in employee
+  const [myWork, setMyWork] = useState([]); 
   // eslint-disable-next-line no-unused-vars
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard'); 
-  const [modal, setModal] = useState({ type: null, id: null }); // 'assign' or 'resolve'
+  const [modal, setModal] = useState({ type: null, id: null }); 
   const [resolutionText, setResolutionText] = useState("");
   const navigate = useNavigate();
 
-  // Check Role
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isManager = user.role === 'manager';
 
@@ -24,14 +23,12 @@ const ManagerDashboard = () => {
     if (!token) { navigate("/login"); return; }
     try {
       if (isManager) {
-          // MANAGER FETCH
           const [ticketRes, analyticsRes] = await Promise.all([
              axios.get("http://localhost:5000/tickets/all", { headers: { token } }),
              axios.get("http://localhost:5000/tickets/analytics", { headers: { token } })
           ]);
-          setData({ tickets: ticketRes.data, team: analyticsRes.data.team, stats: analyticsRes.data.stats });
+          setData({ tickets: ticketRes.data, team: analyticsRes.data.team, stats: analyticsRes.data.stats || {} });
       } else {
-          // EMPLOYEE FETCH
           const workRes = await axios.get("http://localhost:5000/tickets/assigned", { headers: { token } });
           setMyWork(workRes.data);
           setActiveTab('my_work');
@@ -53,8 +50,17 @@ const ManagerDashboard = () => {
           alert("Success!");
           setModal({ type: null, id: null });
           fetchData(); 
-      } catch (error) { alert("Action Failed: " + (error.response?.data?.error || error.message)); }
+      } catch (err) { alert("Action Failed: " + (err.response?.data?.error || err.message)); }
   };
+
+  // --- CALCULATED STATS ---
+  // 1. Total Active = All Tickets - Resolved
+  const totalTickets = parseInt(data.stats?.total || 0);
+  const resolvedTickets = parseInt(data.stats?.resolved || 0);
+  const openTickets = parseInt(data.stats?.open || 0);
+  
+  const activeTickets = totalTickets - resolvedTickets;
+  const assignedTickets = activeTickets - openTickets; // Active but not Open means Assigned
 
   return (
     <div className="flex min-h-screen bg-[#f0f4f8] font-sans">
@@ -84,7 +90,7 @@ const ManagerDashboard = () => {
 
       <main className="flex-1 ml-72 p-10">
         
-        {/* EMPLOYEE VIEW: MY WORK */}
+        {/* EMPLOYEE VIEW */}
         {!isManager && (
             <div>
                 <header className="mb-10 flex justify-between items-end">
@@ -115,7 +121,7 @@ const ManagerDashboard = () => {
             </div>
         )}
 
-        {/* MANAGER VIEWS */}
+        {/* MANAGER DASHBOARD */}
         {isManager && activeTab === 'dashboard' && (
            <>
                <header className="flex justify-between items-end mb-10">
@@ -123,25 +129,28 @@ const ManagerDashboard = () => {
                     <h1 className="text-4xl font-bold text-gray-800">Overview</h1>
                     <p className="text-gray-500 mt-1">Real-time support ticket analytics</p>
                   </motion.div>
-                  {/* FIXED DATE UI */}
                   <div className="bg-white px-5 py-2.5 rounded-full shadow-sm text-sm font-semibold text-sud-blue border border-blue-50">
                     {new Date().toDateString()}
                   </div>
                 </header>
 
-                {/* STATS CARDS (Fixed 0 values) */}
+                {/* UX IMPROVEMENT: Updated Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                   <StatCard title="Total Tickets" count={data.stats?.total || 0} color="red" icon={<FiAlertCircle className="text-2xl"/>} />
-                   <StatCard title="Pending" count={data.stats?.open || 0} color="yellow" icon={<FiClock className="text-2xl"/>} />
-                   <StatCard title="Resolved" count={data.stats?.resolved || 0} color="green" icon={<FiCheckCircle className="text-2xl"/>} />
+                   <StatCard title="Active Tickets" count={activeTickets} color="red" icon={<FiAlertCircle className="text-2xl"/>} />
+                   <StatCard title="Assigned / In Progress" count={assignedTickets} color="yellow" icon={<FiClock className="text-2xl"/>} />
+                   <StatCard title="Resolved" count={resolvedTickets} color="green" icon={<FiCheckCircle className="text-2xl"/>} />
                 </div>
 
                <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-                   <div className="px-8 py-6 border-b bg-gray-50/50"><h2 className="font-bold text-gray-700 text-lg">Incoming Requests</h2></div>
+                   <div className="px-8 py-6 border-b bg-gray-50/50 flex justify-between items-center">
+                       <h2 className="font-bold text-gray-700 text-lg">Active Requests</h2>
+                       <span className="text-xs text-gray-400 uppercase font-bold">Hidden: {resolvedTickets} Resolved</span>
+                   </div>
                    <table className="w-full text-left">
                        <thead className="bg-gray-50 text-gray-400 text-xs uppercase"><tr><th className="px-8 py-4">Subject</th><th className="px-8 py-4">User</th><th className="px-8 py-4">Priority</th><th className="px-8 py-4">Assigned To</th><th className="px-8 py-4">Action</th></tr></thead>
                        <tbody>
-                           {data.tickets.map(t => (
+                           {/* UX IMPROVEMENT: Filter out resolved tickets */}
+                           {data.tickets.filter(t => t.status !== 'resolved').map(t => (
                                <tr key={t.ticket_id} className="hover:bg-blue-50/50 border-b border-gray-50 last:border-0">
                                    <td className="px-8 py-4 font-bold text-gray-800">{t.title}</td>
                                    <td className="px-8 py-4 text-gray-600">{t.created_by}</td>
@@ -152,6 +161,9 @@ const ManagerDashboard = () => {
                                    </td>
                                </tr>
                            ))}
+                           {data.tickets.filter(t => t.status !== 'resolved').length === 0 && (
+                               <tr><td colSpan="5" className="px-8 py-8 text-center text-gray-400">No active tickets! Good job team.</td></tr>
+                           )}
                        </tbody>
                    </table>
                </div>
