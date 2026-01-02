@@ -6,15 +6,12 @@ const seedDatabase = async () => {
     try {
         console.log("🌱 Seeding Database...");
 
-        // 1. Hash the password '12345'
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash("12345", salt);
 
-        // 2. Clear existing data (optional, to avoid duplicates)
         await pool.query("TRUNCATE TABLE tickets, employees, users RESTART IDENTITY CASCADE");
 
-        // 3. Create a Manager (IT Head)
-        // Login: admin@sudlife.in / 12345
+        // 1. Manager (IT Head)
         const managerRes = await pool.query(
             `INSERT INTO employees (full_name, email, password_hash, role, experience_level) 
              VALUES ($1, $2, $3, $4, $5) RETURNING employee_id`,
@@ -22,16 +19,23 @@ const seedDatabase = async () => {
         );
         const managerId = managerRes.rows[0].employee_id;
 
-        // 4. Create a Support Agent (Reports to Manager)
-        // Login: rahul@sudlife.in / 12345
-        await pool.query(
-            `INSERT INTO employees (full_name, email, password_hash, role, experience_level, manager_id) 
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            ['Rahul Support', 'rahul@sudlife.in', hashedPassword, 'support', 1, managerId]
-        );
+        // 2. Support Staff (Expanded Team)
+        const employees = [
+            ['Rahul Support', 'rahul@sudlife.in', 'support', 1],
+            ['Anjali Senior', 'anjali@sudlife.in', 'support', 3],
+            ['Vikram Tech', 'vikram@sudlife.in', 'support', 4],
+            ['Siddharth Lead', 'siddharth@sudlife.in', 'support', 5],
+        ];
 
-        // 5. Create a Policyholder (User)
-        // Login: amit@gmail.com / 12345
+        for (let emp of employees) {
+            await pool.query(
+                `INSERT INTO employees (full_name, email, password_hash, role, experience_level, manager_id) 
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [emp[0], emp[1], hashedPassword, emp[2], emp[3], managerId]
+            );
+        }
+
+        // 3. Customer
         await pool.query(
             `INSERT INTO users (full_name, email, password_hash, policy_number) 
              VALUES ($1, $2, $3, $4)`,
@@ -39,8 +43,10 @@ const seedDatabase = async () => {
         );
 
         console.log("✅ Database Populated Successfully!");
-        console.log("👉 Manager Login: admin@sudlife.in | Pass: 12345");
-        console.log("👉 User Login:    amit@gmail.com   | Pass: 12345");
+        console.log("👉 Manager: admin@sudlife.in");
+        console.log("👉 Team: rahul@sudlife.in, anjali@sudlife.in, vikram@sudlife.in");
+        console.log("👉 User: amit@gmail.com");
+        console.log("🔑 Password for all: 12345");
         process.exit();
 
     } catch (err) {
