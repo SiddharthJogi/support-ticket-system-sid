@@ -13,7 +13,7 @@ const checkRole = (allowedRoles) => {
   };
 };
 
-// 1. CREATE TICKET (User)
+// 1. CREATE TICKET (User Only)
 router.post("/", authorize, checkRole(['user']), async (req, res) => {
   try {
     const { title, description, category, priority } = req.body;
@@ -39,7 +39,7 @@ router.get("/all", authorize, checkRole(['manager', 'admin']), async (req, res) 
   } catch (err) { res.status(500).send("Server Error"); }
 });
 
-// 3. GET MY ASSIGNED TICKETS (Support Staff Only) <--- THIS WAS MISSING
+// 3. GET MY ASSIGNED TICKETS (Support Staff Only) <--- RESTORED
 router.get("/assigned", authorize, checkRole(['support', 'manager']), async (req, res) => {
     try {
       const myWork = await pool.query(
@@ -68,7 +68,7 @@ router.get("/my-tickets", authorize, async (req, res) => {
   } catch (err) { res.status(500).send("Server Error"); }
 });
 
-// 5. ASSIGN TICKET (Manager)
+// 5. ASSIGN TICKET (Manager) <--- RESTORED
 router.put("/assign/:id", authorize, checkRole(['manager']), async (req, res) => {
   try {
     const { id } = req.params;
@@ -78,7 +78,7 @@ router.put("/assign/:id", authorize, checkRole(['manager']), async (req, res) =>
   } catch (err) { res.status(500).send("Server Error"); }
 });
 
-// 6. RESOLVE TICKET (Support Staff)
+// 6. RESOLVE TICKET (Support Staff) <--- RESTORED
 router.put("/resolve/:id", authorize, checkRole(['support', 'manager']), async (req, res) => {
     try {
       const { id } = req.params;
@@ -91,7 +91,7 @@ router.put("/resolve/:id", authorize, checkRole(['support', 'manager']), async (
     } catch (err) { res.status(500).send("Server Error"); }
   });
 
-// 7. ANALYTICS (Manager)
+// 7. ANALYTICS (Manager) <--- RESTORED
 router.get("/analytics", authorize, checkRole(['manager']), async (req, res) => {
     try {
         const team = await pool.query(`

@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import { FiGrid, FiUsers, FiActivity, FiLogOut, FiCheckCircle, FiClock, FiAlertCircle, FiX, FiBriefcase } from "react-icons/fi";
 
 const ManagerDashboard = () => {
   const [data, setData] = useState({ tickets: [], team: [], stats: {} });
   const [myWork, setMyWork] = useState([]); // Tickets assigned to logged-in employee
+  // eslint-disable-next-line no-unused-vars
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard'); 
   const [modal, setModal] = useState({ type: null, id: null }); // 'assign' or 'resolve'
@@ -51,7 +53,7 @@ const ManagerDashboard = () => {
           alert("Success!");
           setModal({ type: null, id: null });
           fetchData(); 
-      } catch (err) { alert("Action Failed"); }
+      } catch (error) { alert("Action Failed: " + (error.response?.data?.error || error.message)); }
   };
 
   return (
