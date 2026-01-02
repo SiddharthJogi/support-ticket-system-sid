@@ -54,7 +54,7 @@ const Login = () => {
         initial={{ x: -100, opacity: 0 }} 
         animate={{ x: 0, opacity: 1 }} 
         transition={{ duration: 0.8, ease: "easeOut" }}
-        className="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 lg:p-16 relative z-10"
+        className="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 lg:p-16 relative z-20 bg-white"
       >
         <div className="w-full max-w-md space-y-8">
           
@@ -136,7 +136,7 @@ const Login = () => {
         initial={{ x: 100, opacity: 0 }} 
         animate={{ x: 0, opacity: 1 }} 
         transition={{ duration: 0.8, ease: "easeOut" }}
-        className="hidden lg:flex w-1/2 bg-sud-blue relative items-center justify-center overflow-hidden"
+        className="hidden lg:flex w-1/2 bg-sud-blue relative items-center justify-center overflow-hidden z-10"
       >
          <div className="absolute inset-0 bg-gradient-to-br from-sud-blue to-[#001f3f] opacity-90 z-10"></div>
          <img src={banner} className="absolute w-[120%] opacity-40 mix-blend-overlay" />

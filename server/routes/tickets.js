@@ -4,19 +4,16 @@ const pool = require("../db");
 const authorize = require("../middleware/authorization");
 
 // --- SECURITY MIDDLEWARE ---
-// This ensures only specific roles can access the route
 const checkRole = (allowedRoles) => {
   return (req, res, next) => {
-    // req.user is set by the 'authorize' middleware
     if (!req.user || !allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ error: "Access Denied: Insufficient Permissions" });
+      return res.status(403).json({ error: "Access Denied" });
     }
     next();
   };
 };
 
-// 1. CREATE TICKET (User Only)
-// We add checkRole(['user']) so employees don't accidentally create tickets for themselves
+// 1. CREATE TICKET (User)
 router.post("/", authorize, checkRole(['user']), async (req, res) => {
   try {
     const { title, description, category, priority } = req.body;
@@ -25,15 +22,11 @@ router.post("/", authorize, checkRole(['user']), async (req, res) => {
       [req.user.id, title, description, category, priority]
     );
     res.json(newTicket.rows[0]);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server Error");
-  }
+  } catch (err) { res.status(500).send("Server Error"); }
 });
 
-// 2. GET ALL TICKETS (Manager & Support Only)
-// SECURITY UPGRADE: Added checkRole(['manager', 'support'])
-router.get("/all", authorize, checkRole(['manager', 'support']), async (req, res) => {
+// 2. GET ALL TICKETS (Manager Only)
+router.get("/all", authorize, checkRole(['manager', 'admin']), async (req, res) => {
   try {
     const allTickets = await pool.query(
       `SELECT t.*, u.full_name as created_by, e.full_name as assigned_employee
@@ -43,13 +36,28 @@ router.get("/all", authorize, checkRole(['manager', 'support']), async (req, res
        ORDER BY t.created_at DESC`
     );
     res.json(allTickets.rows);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server Error");
-  }
+  } catch (err) { res.status(500).send("Server Error"); }
 });
 
-// 3. GET MY TICKETS (User Only)
+// 3. GET MY ASSIGNED TICKETS (Support Staff Only) <--- THIS WAS MISSING
+router.get("/assigned", authorize, checkRole(['support', 'manager']), async (req, res) => {
+    try {
+      const myWork = await pool.query(
+        `SELECT t.*, u.full_name as created_by
+         FROM tickets t 
+         JOIN users u ON t.user_id = u.user_id 
+         WHERE t.assigned_to = $1 AND t.status != 'resolved'
+         ORDER BY CASE WHEN t.priority = 'urgent' THEN 1 ELSE 2 END, t.created_at ASC`,
+        [req.user.id]
+      );
+      res.json(myWork.rows);
+    } catch (err) { 
+        console.error(err);
+        res.status(500).send("Server Error"); 
+    }
+});
+
+// 4. GET MY TICKETS (User)
 router.get("/my-tickets", authorize, async (req, res) => {
   try {
     const myTickets = await pool.query(
@@ -57,32 +65,33 @@ router.get("/my-tickets", authorize, async (req, res) => {
       [req.user.id]
     );
     res.json(myTickets.rows);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server Error");
-  }
+  } catch (err) { res.status(500).send("Server Error"); }
 });
 
-// 4. ASSIGN TICKET (Manager Only)
-// SECURITY UPGRADE: Added checkRole(['manager'])
+// 5. ASSIGN TICKET (Manager)
 router.put("/assign/:id", authorize, checkRole(['manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const { employee_id } = req.body;
-
-    await pool.query(
-      "UPDATE tickets SET assigned_to = $1, status = 'in_progress' WHERE ticket_id = $2",
-      [employee_id, id]
-    );
+    await pool.query("UPDATE tickets SET assigned_to = $1, status = 'in_progress' WHERE ticket_id = $2", [employee_id, id]);
     res.json({ message: "Assigned Successfully" });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server Error");
-  }
+  } catch (err) { res.status(500).send("Server Error"); }
 });
 
-// 5. ANALYTICS (Manager Only)
-// SECURITY UPGRADE: Added checkRole(['manager'])
+// 6. RESOLVE TICKET (Support Staff)
+router.put("/resolve/:id", authorize, checkRole(['support', 'manager']), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { resolution_notes } = req.body;
+      await pool.query(
+          "UPDATE tickets SET status = 'resolved', resolution_notes = $1 WHERE ticket_id = $2", 
+          [resolution_notes, id]
+      );
+      res.json({ message: "Ticket Resolved" });
+    } catch (err) { res.status(500).send("Server Error"); }
+  });
+
+// 7. ANALYTICS (Manager)
 router.get("/analytics", authorize, checkRole(['manager']), async (req, res) => {
     try {
         const team = await pool.query(`
@@ -92,7 +101,6 @@ router.get("/analytics", authorize, checkRole(['manager']), async (req, res) => 
             LEFT JOIN tickets t ON e.employee_id = t.assigned_to AND t.status != 'resolved'
             GROUP BY e.employee_id
         `);
-
         const stats = await pool.query(`
             SELECT 
                 COUNT(*) as total,
@@ -101,12 +109,8 @@ router.get("/analytics", authorize, checkRole(['manager']), async (req, res) => 
                 SUM(CASE WHEN priority = 'urgent' THEN 1 ELSE 0 END) as urgent
             FROM tickets
         `);
-
         res.json({ team: team.rows, stats: stats.rows[0] });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Server Error");
-    }
+    } catch (err) { res.status(500).send("Server Error"); }
 });
 
 module.exports = router;
