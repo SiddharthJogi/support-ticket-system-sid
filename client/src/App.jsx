@@ -1,8 +1,7 @@
-/* client/src/App.jsx */
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/login';
-import ManagerDashboard from './pages/ManagerDashboard'; // <--- NEW IMPORT
-import UserDashboard from './pages/UserDashboard'; // <--- NEW IMPORT
+import ManagerDashboard from './pages/ManagerDashboard'; 
+import UserDashboard from './pages/UserDashboard'; 
 
 function App() {
   return (
@@ -14,10 +13,10 @@ function App() {
         {/* Login Page */}
         <Route path="/login" element={<Login />} />
         
-        {/* Manager Dashboard (Connected to the file you created) */}
+        {/* Manager Dashboard */}
         <Route path="/dashboard" element={<ManagerDashboard />} /> 
         
-        {/* User Dashboard Placeholder (We build this next) */}
+        {/* User Dashboard Placeholder */}
         <Route path="/my-tickets" element={
             <UserDashboard />
         } />
