@@ -3,7 +3,7 @@ const router = require("express").Router();
 const pool = require("../db");
 const authorize = require("../middleware/authorization");
 const nodemailer = require("nodemailer");
-require("dotenv").config(); // Ensure env vars are loaded
+require("dotenv").config(); 
 
 // --- SECURITY MIDDLEWARE ---
 const checkRole = (allowedRoles) => {
@@ -53,10 +53,7 @@ router.get("/assigned", authorize, checkRole(['support', 'manager']), async (req
         [req.user.id]
       );
       res.json(myWork.rows);
-    } catch (err) { 
-        console.error(err);
-        res.status(500).send("Server Error"); 
-    }
+    } catch (err) { res.status(500).send("Server Error"); }
 });
 
 // 4. GET MY TICKETS (User)
@@ -80,34 +77,36 @@ router.put("/assign/:id", authorize, checkRole(['manager']), async (req, res) =>
   } catch (err) { res.status(500).send("Server Error"); }
 });
 
-// 6. RESOLVE TICKET (Support Staff) -- FIXED NODEMAILER --
+// 6. RESOLVE TICKET (Support Staff) -- DEBUG MODE --
 router.put("/resolve/:id", authorize, checkRole(['support', 'manager']), async (req, res) => {
     try {
       const { id } = req.params;
       const { resolution_notes } = req.body;
 
-      // 1. Setup Email Credentials inside route (Best Practice)
+      // DEBUG: Check Env Variables
       const EMAIL_USER = process.env.EMAIL_USER;
       const EMAIL_PASS = process.env.EMAIL_PASS;
+      
+      console.log("------------------------------------------------");
+      console.log(`📧 Attempting to resolve Ticket #${id}`);
+      console.log(`🔐 Sender: ${EMAIL_USER}`);
+      console.log(`🔑 Password Loaded: ${EMAIL_PASS ? "YES (Hidden)" : "NO (Check .env)"}`);
 
       if (!EMAIL_USER || !EMAIL_PASS) {
-          console.error("❌ Missing Email Credentials in .env");
-          // Proceed to close ticket even if email fails, but log error
+          console.error("❌ CRITICAL: Email credentials missing in .env");
+          // Proceed to close ticket but warn
       }
 
-      // 2. Configure Transporter with Explicit SSL (Port 465)
+      // Configure Transporter
       const transporter = nodemailer.createTransport({
           host: 'smtp.gmail.com', 
           port: 465,
-          secure: true, // Use SSL
-          auth: {
-              user: EMAIL_USER,
-              pass: EMAIL_PASS
-          },
+          secure: true, 
+          auth: { user: EMAIL_USER, pass: EMAIL_PASS },
           connectionTimeout: 10000 
       });
 
-      // 3. Update DB
+      // Update DB
       const ticketRes = await pool.query(
           "UPDATE tickets SET status = 'resolved', resolution_notes = $1 WHERE ticket_id = $2 RETURNING *", 
           [resolution_notes, id]
@@ -115,11 +114,13 @@ router.put("/resolve/:id", authorize, checkRole(['support', 'manager']), async (
 
       if (ticketRes.rows.length === 0) return res.status(404).json({error: "Ticket not found"});
       
-      // 4. Get Recipient Details
+      // Get Recipient
       const userRes = await pool.query("SELECT full_name, email FROM users WHERE user_id = $1", [ticketRes.rows[0].user_id]);
       const user = userRes.rows[0];
 
-      // 5. Prepare Email
+      console.log(`📨 Recipient Found: ${user.email} (${user.full_name})`);
+
+      // Prepare Email
       const mailOptions = {
         from: `"SUD Life Support" <${EMAIL_USER}>`, 
         to: user.email,
@@ -142,13 +143,14 @@ router.put("/resolve/:id", authorize, checkRole(['support', 'manager']), async (
         `
       };
 
-      // 6. Send & Log
+      // Send & Log
       try {
         await transporter.sendMail(mailOptions);
-        console.log(`✅ Email sent to ${user.email}`);
+        console.log(`✅ SUCCESS: Email sent to ${user.email}`);
       } catch (emailErr) {
-        console.error("❌ Email Failed:", emailErr);
+        console.error("❌ EMAIL FAILED:", emailErr);
       }
+      console.log("------------------------------------------------");
 
       res.json({ message: "Ticket Resolved" });
 
