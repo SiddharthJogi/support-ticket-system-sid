@@ -5,12 +5,23 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiSearch, FiPlus, FiFileText, FiDollarSign, FiUser, FiInfo, FiX, FiClock, FiCheckCircle } from 'react-icons/fi';
 
+// eslint-disable-next-line no-unused-vars
+import { ToastContainer, toast } from 'react-toastify'; // Optional: Use a library or simple alert
+import 'react-toastify/dist/ReactToastify.css'; // If you use toastify
+
+import { socket } from "../socket";
+
+
+
 const UserDashboard = () => {
   const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [activeModal, setActiveModal] = useState(null);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [formData, setFormData] = useState({ title: '', description: '', category: 'Policy', priority: 'medium' });
+
+    // Listen for Resolution
+    
 
   const fetchTickets = async () => {
       const token = localStorage.getItem('token');
@@ -22,6 +33,20 @@ const UserDashboard = () => {
   };
 
   useEffect(() => { fetchTickets(); }, [navigate]);
+
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user'));
+
+    socket.on("ticket_resolved", (data) => {
+        // Check if the resolved ticket belongs to THIS user
+        if (user && data.user_id === user.id) {
+            alert(`🎉 Good News! Your ticket #${data.ticket_id} has been resolved!`);
+            fetchTickets(); // Refresh the list to show the green checkmark
+        }
+    });
+
+    return () => socket.off("ticket_resolved");
+}, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

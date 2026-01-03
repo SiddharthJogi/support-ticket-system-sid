@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import { FiGrid, FiUsers, FiActivity, FiLogOut, FiCheckCircle, FiClock, FiAlertCircle, FiX, FiBriefcase } from "react-icons/fi";
+import { socket } from "../socket";
 
 const ManagerDashboard = () => {
   const [data, setData] = useState({ tickets: [], team: [], stats: {} });
@@ -17,6 +18,20 @@ const ManagerDashboard = () => {
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isManager = user.role === 'manager';
+
+    // 1. Listen for Real-Time Updates
+    useEffect(() => {
+        // If a new ticket comes in, refresh data
+        socket.on("new_ticket", (data) => {
+            // Optional: You could show a "New Ticket!" toast here
+            console.log("🔔 Real-time update:", data);
+            fetchData(); 
+        });
+
+        return () => {
+            socket.off("new_ticket"); // Cleanup listener on unmount
+        };
+    }, []);
 
   const fetchData = async () => {
     const token = localStorage.getItem("token");
